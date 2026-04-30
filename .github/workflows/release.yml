@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Release Package (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            label: macos-x64
+          - os: macos-14
+            label: macos-arm64
+          - os: windows-latest
+            label: windows-x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify runtime
+        run: pnpm run verify:runtime
+
+      - name: Package runner artifact
+        run: pnpm run package:runner
+        env:
+          ARTIFACT_LABEL: ${{ matrix.label }}
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.label }}
+          path: artifacts/**
+
+  publish:
+    name: Publish Release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: release-*
+
+      - name: Bundle release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundles
+          VERSION="${GITHUB_REF_NAME}"
+          for dir in release-artifacts/release-*; do
+            label="${dir#release-artifacts/release-}"
+            archive="bundles/spdog-${VERSION}-${label}.zip"
+            (
+              cd "$dir"
+              zip -r "../../${archive}" .
+            )
+          done
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bundles/*.zip
+          generate_release_notes: true

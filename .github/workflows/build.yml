@@ -11,8 +11,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  verify:
-    name: Verify (${{ matrix.label }})
+  build_and_package:
+    name: Build And Package (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -52,46 +52,6 @@ jobs:
 
       - name: Verify runtime
         run: pnpm run verify:runtime
-
-  package:
-    name: Package (${{ matrix.label }})
-    needs: verify
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-15-intel
-            label: macos-x64
-          - os: macos-14
-            label: macos-arm64
-          - os: windows-latest
-            label: windows-x64
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.12.4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-      - name: Test
-        run: pnpm test
 
       - name: Install UPX
         if: runner.os == 'Windows'

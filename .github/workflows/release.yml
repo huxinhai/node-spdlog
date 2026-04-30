@@ -52,10 +52,18 @@ jobs:
       - name: Verify runtime
         run: pnpm run verify:runtime
 
+      - name: Install UPX
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: choco install upx -y
+
       - name: Package runner artifact
         run: pnpm run package:runner
         env:
           ARTIFACT_LABEL: ${{ matrix.label }}
+
+      - name: Verify packaged artifact
+        run: node -e "const spdog=require('./artifacts/${{ matrix.label }}/dist'); spdog.info('packaged artifact verification ok'); console.log(JSON.stringify(spdog.version));"
 
       - name: Upload packaged artifact
         uses: actions/upload-artifact@v7

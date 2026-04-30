@@ -157,4 +157,5 @@ pnpm run build:artifacts
 
 - Native module output name is `spdog.node`
 - macOS packaging strips symbols to reduce binary size
+- Windows packaging uses `upx --best --lzma`
 - `build/`, `dist/`, and `artifacts/` are generated outputs

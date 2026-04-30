@@ -54,6 +54,12 @@ function stripIfMac(filePath) {
   }
 }
 
+function compressIfWindows(filePath) {
+  if (process.platform === "win32") {
+    execFileSync("upx", ["--best", "--lzma", filePath], { cwd: rootDir, stdio: "inherit" });
+  }
+}
+
 function main() {
   const targetDir = path.join(artifactsDir, artifactLabel());
   cleanDir(targetDir);
@@ -64,6 +70,7 @@ function main() {
 
   copyFileSync(releaseNodePath, path.join(targetDir, "spdog.node"));
   stripIfMac(path.join(targetDir, "spdog.node"));
+  compressIfWindows(path.join(targetDir, "spdog.node"));
 
   if (existsSync(distDir)) {
     cpSync(distDir, path.join(targetDir, "dist"), { recursive: true });

@@ -100,7 +100,7 @@ Available APIs:
 
 It verifies and packages on:
 
-- `macos-13` as `macos-x64`
+- `macos-15-intel` as `macos-x64`
 - `macos-14` as `macos-arm64`
 - `windows-latest` as `windows-x64`
 

@@ -44,7 +44,8 @@
             "msvs_settings": {
               "VCCLCompilerTool": {
                 "AdditionalOptions": [
-                  "/std:c++20"
+                  "/std:c++20",
+                  "/utf-8"
                 ],
                 "ExceptionHandling": 1
               }

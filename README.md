@@ -110,7 +110,7 @@ Each run will:
 2. Install dependencies with `pnpm`
 3. Run `pnpm build`
 4. Run `pnpm run verify:runtime`
-5. Upload built files and packaged artifacts
+5. Upload packaged artifacts
 
 ### Release
 

@@ -55,12 +55,21 @@ if (!isMainThread) {
   function runWorker(id, filePath, iterations) {
     return new Promise((resolve, reject) => {
       let settled = false;
+      let sawSuccessMessage = false;
+      let exitCode = null;
+
       const finish = (callback, value) => {
         if (settled) {
           return;
         }
         settled = true;
         callback(value);
+      };
+
+      const maybeResolve = () => {
+        if (sawSuccessMessage && exitCode === 0) {
+          finish(resolve);
+        }
       };
 
       const worker = new Worker(__filename, {
@@ -74,7 +83,8 @@ if (!isMainThread) {
 
       worker.once("message", (message) => {
         if (message && message.ok) {
-          finish(resolve);
+          sawSuccessMessage = true;
+          maybeResolve();
           return;
         }
 
@@ -83,49 +93,61 @@ if (!isMainThread) {
 
       worker.once("error", (error) => finish(reject, error));
       worker.once("exit", (code) => {
+        exitCode = code;
         if (code !== 0) {
           finish(reject, new Error(`worker ${id} exited with code ${code}`));
+          return;
         }
+
+        maybeResolve();
       });
     });
   }
 
   test("useBasicFileLogger keeps previous logger active when new file logger creation fails", () => {
     withTempDir((tempDir) => {
-      const validFilePath = path.join(tempDir, "valid.log");
+      try {
+        const validFilePath = path.join(tempDir, "valid.log");
 
-      spdog.useConsoleLogger();
-      spdog.info("console logger still works before failure");
+        spdog.useConsoleLogger();
+        spdog.info("console logger still works before failure");
 
-      assert.throws(
-        () => spdog.useBasicFileLogger("invalid-file-target", tempDir, true),
-        /Failed opening file/
-      );
+        assert.throws(
+          () => spdog.useBasicFileLogger("invalid-file-target", tempDir, true),
+          /Failed opening file/
+        );
 
-      spdog.useBasicFileLogger("valid-file-target", validFilePath, true);
-      spdog.info("file logger works after failed switch");
-      spdog.flush();
+        spdog.useBasicFileLogger("valid-file-target", validFilePath, true);
+        spdog.info("file logger works after failed switch");
+        spdog.flush();
 
-      const contents = fs.readFileSync(validFilePath, "utf8");
-      assert.match(contents, /file logger works after failed switch/);
+        const contents = fs.readFileSync(validFilePath, "utf8");
+        assert.match(contents, /file logger works after failed switch/);
+      } finally {
+        spdog.useConsoleLogger();
+      }
     });
   });
 
   test("optional boolean accepts null and preserves append mode default", () => {
     withTempDir((tempDir) => {
-      const filePath = path.join(tempDir, "append.log");
+      try {
+        const filePath = path.join(tempDir, "append.log");
 
-      spdog.useBasicFileLogger("append-file", filePath, true);
-      spdog.info("first line");
-      spdog.flush();
+        spdog.useBasicFileLogger("append-file", filePath, true);
+        spdog.info("first line");
+        spdog.flush();
 
-      spdog.useBasicFileLogger("append-file", filePath, null);
-      spdog.info("second line");
-      spdog.flush();
+        spdog.useBasicFileLogger("append-file", filePath, null);
+        spdog.info("second line");
+        spdog.flush();
 
-      const contents = fs.readFileSync(filePath, "utf8");
-      assert.match(contents, /first line/);
-      assert.match(contents, /second line/);
+        const contents = fs.readFileSync(filePath, "utf8");
+        assert.match(contents, /first line/);
+        assert.match(contents, /second line/);
+      } finally {
+        spdog.useConsoleLogger();
+      }
     });
   });
 
@@ -138,20 +160,24 @@ if (!isMainThread) {
 
   test("worker threads can switch loggers concurrently without crashing", async () => {
     await withTempDir(async (tempDir) => {
-      const workerCount = 4;
-      const iterations = 200;
-      const filePaths = Array.from({ length: workerCount }, (_, index) => path.join(tempDir, `worker-${index}.log`));
+      try {
+        const workerCount = 4;
+        const iterations = 200;
+        const filePaths = Array.from({ length: workerCount }, (_, index) => path.join(tempDir, `worker-${index}.log`));
 
-      await Promise.all(filePaths.map((filePath, index) => runWorker(index, filePath, iterations)));
+        await Promise.all(filePaths.map((filePath, index) => runWorker(index, filePath, iterations)));
 
-      const totalBytes = filePaths.reduce((sum, filePath) => {
-        if (!fs.existsSync(filePath)) {
-          return sum;
-        }
-        return sum + fs.statSync(filePath).size;
-      }, 0);
+        const totalBytes = filePaths.reduce((sum, filePath) => {
+          if (!fs.existsSync(filePath)) {
+            return sum;
+          }
+          return sum + fs.statSync(filePath).size;
+        }, 0);
 
-      assert.ok(totalBytes > 0, "expected at least one worker log file to contain data");
+        assert.ok(totalBytes > 0, "expected at least one worker log file to contain data");
+      } finally {
+        spdog.useConsoleLogger();
+      }
     });
   });
 

@@ -14,10 +14,12 @@ struct Version {
 };
 
 void Initialize();
+void RegisterEnvironment();
+void CleanupEnvironment() noexcept;
 void Log(spdlog::level::level_enum level, const std::string& message);
 void SetLevel(spdlog::level::level_enum level);
 void SetFlushOn(spdlog::level::level_enum level);
-void SetPattern(const std::string& pattern);
+void SetPattern(std::string pattern);
 void UseConsoleLogger();
 void UseBasicFileLogger(const std::string& name, const std::string& file_path, bool truncate);
 void Flush();

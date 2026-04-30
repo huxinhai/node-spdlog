@@ -13,7 +13,7 @@ std::string ReadRequiredString(const Napi::CallbackInfo& info, std::size_t index
 }
 
 bool ReadOptionalBool(const Napi::CallbackInfo& info, std::size_t index, bool default_value, const char* name) {
-  if (info.Length() <= index || info[index].IsUndefined()) {
+  if (info.Length() <= index || info[index].IsUndefined() || info[index].IsNull()) {
     return default_value;
   }
 

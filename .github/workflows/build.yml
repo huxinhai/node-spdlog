@@ -47,6 +47,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Test
+        run: pnpm test
+
       - name: Verify runtime
         run: pnpm run verify:runtime
 
@@ -86,6 +89,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Test
+        run: pnpm test
 
       - name: Install UPX
         if: runner.os == 'Windows'

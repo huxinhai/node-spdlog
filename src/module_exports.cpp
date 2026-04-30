@@ -5,6 +5,10 @@
 
 namespace {
 
+void CleanupEnvironmentHook(void*) {
+  node_spdlog::CleanupEnvironment();
+}
+
 template <spdlog::level::level_enum Level>
 Napi::Value LogAtLevel(const Napi::CallbackInfo& info) {
   return node_spdlog::WrapVoid(info, [&]() {
@@ -73,7 +77,19 @@ Napi::Object CreateVersionObject(Napi::Env env) {
 namespace node_spdlog {
 
 Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
-  Initialize();
+  RegisterEnvironment();
+
+  const auto cleanup_status = napi_add_env_cleanup_hook(
+    env,
+    CleanupEnvironmentHook,
+    nullptr
+  );
+
+  if (cleanup_status != napi_ok) {
+    CleanupEnvironment();
+    Napi::Error::New(env, "Failed to register native cleanup hook").ThrowAsJavaScriptException();
+    return exports;
+  }
 
   exports.Set("log", Napi::Function::New(env, LogBinding));
   exports.Set("trace", Napi::Function::New(env, LogAtLevel<spdlog::level::trace>));

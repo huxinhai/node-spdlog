@@ -28,6 +28,7 @@
     "install": "node-gyp rebuild",
     "build:artifacts": "node scripts/build-artifacts.mjs",
     "package:runner": "node scripts/package-runner-artifact.mjs",
+    "test": "node --test test/runtime.test.js",
     "verify:runtime": "node scripts/verify-runtime.mjs"
   },
   "keywords": [

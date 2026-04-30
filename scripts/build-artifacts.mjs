@@ -1,20 +1,33 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 
 const rootDir = process.cwd();
 const artifactsDir = path.join(rootDir, "artifacts");
+const require = createRequire(import.meta.url);
 const sourceFiles = [
   "src/addon.cpp",
   "src/module_exports.cpp",
   "src/logger.cpp",
   "src/js_args.cpp"
 ];
-const nodeAddonApiInclude = path.join(
-  rootDir,
-  "node_modules/.pnpm/node-addon-api@8.7.0/node_modules/node-addon-api"
-);
-const nodeHeadersInclude = path.join(process.env.HOME ?? "", "Library/Caches/node-gyp/25.9.0/include/node");
+
+function resolveNodeAddonApiInclude() {
+  return path.dirname(require.resolve("node-addon-api"));
+}
+
+function resolveNodeHeadersInclude() {
+  const includeDir = path.join(os.homedir(), "Library", "Caches", "node-gyp", process.versions.node, "include", "node");
+  if (!existsSync(includeDir)) {
+    throw new Error(`Missing Node headers at ${includeDir}. Run "pnpm install" or "node-gyp install" first.`);
+  }
+  return includeDir;
+}
+
+const nodeAddonApiInclude = resolveNodeAddonApiInclude();
+const nodeHeadersInclude = resolveNodeHeadersInclude();
 
 function run(command, args) {
   execFileSync(command, args, {
@@ -160,4 +173,3 @@ function main() {
 }
 
 main();
-

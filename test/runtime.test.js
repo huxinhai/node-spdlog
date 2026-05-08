@@ -151,6 +151,25 @@ if (!isMainThread) {
     });
   });
 
+  test("useBasicFileLogger supports unicode paths", () => {
+    withTempDir((tempDir) => {
+      try {
+        const unicodeDir = path.join(tempDir, "中文用户名-陈肖剑");
+        const filePath = path.join(unicodeDir, "main.log");
+
+        spdog.useBasicFileLogger("unicode-file-target", filePath, true);
+        spdog.info("unicode path logger works");
+        spdog.flush();
+
+        assert.ok(fs.existsSync(unicodeDir), "expected native logger to create unicode directory");
+        const contents = fs.readFileSync(filePath, "utf8");
+        assert.match(contents, /unicode path logger works/);
+      } finally {
+        spdog.useConsoleLogger();
+      }
+    });
+  });
+
   test("invalid log levels list supported values", () => {
     assert.throws(
       () => spdog.setLevel("verbose"),

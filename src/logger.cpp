@@ -1,10 +1,12 @@
 #include "logger.h"
 
 #include <atomic>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 
+#include "spdlog/details/os.h"
 #include "spdlog/logger.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
@@ -58,12 +60,38 @@ std::shared_ptr<spdlog::logger> CreateConsoleLogger() {
   return std::make_shared<spdlog::logger>(kConsoleLoggerName, std::move(sink));
 }
 
+spdlog::filename_t ToSpdlogFilename(const std::string& file_path) {
+#if defined(_WIN32) && defined(SPDLOG_WCHAR_FILENAMES)
+  spdlog::wmemory_buf_t wide_path;
+  spdlog::details::os::utf8_to_wstrbuf(
+    spdlog::string_view_t(file_path.data(), file_path.size()),
+    wide_path
+  );
+  return spdlog::filename_t(wide_path.data(), wide_path.size());
+#else
+  return file_path;
+#endif
+}
+
+void EnsureContainingDirectory(const spdlog::filename_t& file_path) {
+  try {
+    const auto parent = std::filesystem::path(file_path).parent_path();
+    if (!parent.empty() && !std::filesystem::exists(parent)) {
+      std::filesystem::create_directories(parent);
+    }
+  } catch (...) {
+    // Let spdlog make the final open attempt and surface the original failure.
+  }
+}
+
 std::shared_ptr<spdlog::logger> CreateBasicFileLogger(
   const std::string& name,
   const std::string& file_path,
   bool truncate
 ) {
-  auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(file_path, truncate);
+  const auto filename = ToSpdlogFilename(file_path);
+  EnsureContainingDirectory(filename);
+  auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(filename, truncate);
   return std::make_shared<spdlog::logger>(name, std::move(sink));
 }
 

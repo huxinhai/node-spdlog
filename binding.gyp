@@ -41,6 +41,9 @@
         [
           "OS==\"win\"",
           {
+            "defines": [
+              "SPDLOG_WCHAR_FILENAMES"
+            ],
             "msvs_settings": {
               "VCCLCompilerTool": {
                 "AdditionalOptions": [

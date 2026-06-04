@@ -1,23 +1,25 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { execFileSync } from "node:child_process";
+const { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } =
+  require("node:fs") as typeof import("node:fs");
+const os = require("node:os") as typeof import("node:os");
+const path = require("node:path") as typeof import("node:path");
+const { execFileSync } =
+  require("node:child_process") as typeof import("node:child_process");
 
 const rootDir = process.cwd();
 const artifactsDir = path.join(rootDir, "artifacts");
 const releaseNodePath = path.join(rootDir, "build", "Release", "spdog.node");
 const distDir = path.join(rootDir, "dist");
 
-function ensureDir(dirPath) {
+function ensureDir(dirPath: string): void {
   mkdirSync(dirPath, { recursive: true });
 }
 
-function cleanDir(dirPath) {
+function cleanDir(dirPath: string): void {
   rmSync(dirPath, { recursive: true, force: true });
   ensureDir(dirPath);
 }
 
-function currentArch() {
+function currentArch(): string {
   if (process.arch === "x64") {
     return "x64";
   }
@@ -27,7 +29,7 @@ function currentArch() {
   return process.arch;
 }
 
-function currentPlatform() {
+function currentPlatform(): string {
   if (process.platform === "darwin") {
     return "macos";
   }
@@ -40,7 +42,7 @@ function currentPlatform() {
   return process.platform;
 }
 
-function artifactLabel() {
+function artifactLabel(): string {
   if (process.env.ARTIFACT_LABEL && process.env.ARTIFACT_LABEL.trim()) {
     return process.env.ARTIFACT_LABEL.trim();
   }
@@ -48,19 +50,19 @@ function artifactLabel() {
   return `${currentPlatform()}-${currentArch()}`;
 }
 
-function stripIfMac(filePath) {
+function stripIfMac(filePath: string): void {
   if (process.platform === "darwin") {
     execFileSync("strip", ["-x", filePath], { cwd: rootDir, stdio: "inherit" });
   }
 }
 
-function compressIfWindows(filePath) {
+function compressIfWindows(filePath: string): void {
   if (process.platform === "win32") {
     execFileSync("upx", ["--best", "--lzma", filePath], { cwd: rootDir, stdio: "inherit" });
   }
 }
 
-function main() {
+function main(): void {
   const targetDir = path.join(artifactsDir, artifactLabel());
   cleanDir(targetDir);
 
@@ -68,9 +70,10 @@ function main() {
     throw new Error(`Missing native module at ${releaseNodePath}. Run pnpm build first.`);
   }
 
-  copyFileSync(releaseNodePath, path.join(targetDir, "spdog.node"));
-  stripIfMac(path.join(targetDir, "spdog.node"));
-  compressIfWindows(path.join(targetDir, "spdog.node"));
+  const targetNodePath = path.join(targetDir, "spdog.node");
+  copyFileSync(releaseNodePath, targetNodePath);
+  stripIfMac(targetNodePath);
+  compressIfWindows(targetNodePath);
 
   if (existsSync(distDir)) {
     cpSync(distDir, path.join(targetDir, "dist"), { recursive: true });

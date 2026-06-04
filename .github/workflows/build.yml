@@ -38,7 +38,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 22.18.0
           cache: pnpm
 
       - name: Install dependencies
@@ -64,7 +64,9 @@ jobs:
           ARTIFACT_LABEL: ${{ matrix.label }}
 
       - name: Verify packaged artifact
-        run: node -e "const spdog=require('./artifacts/${{ matrix.label }}/dist'); spdog.info('packaged artifact verification ok'); console.log(JSON.stringify(spdog.version));"
+        run: pnpm run verify:packaged
+        env:
+          ARTIFACT_LABEL: ${{ matrix.label }}
 
       - name: Upload packaged artifact
         uses: actions/upload-artifact@v7

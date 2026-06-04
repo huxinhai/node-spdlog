@@ -1,39 +1,71 @@
-const assert = require("node:assert/strict");
-const { execFileSync } = require("node:child_process");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const test = require("node:test");
-const { Worker, isMainThread, parentPort, workerData } = require("node:worker_threads");
+import type { NativeBinding } from "../src/type";
+
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const { execFileSync } =
+  require("node:child_process") as typeof import("node:child_process");
+const fs = require("node:fs") as typeof import("node:fs");
+const os = require("node:os") as typeof import("node:os");
+const path = require("node:path") as typeof import("node:path");
+const test = require("node:test") as typeof import("node:test");
+const { Worker, isMainThread, parentPort, workerData } =
+  require("node:worker_threads") as typeof import("node:worker_threads");
+
+type RuntimeWorkerData = {
+  id: number;
+  filePath: string;
+  iterations: number;
+  loggerName: string;
+};
+
+type WorkerMessage =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+function loadSpdog(): NativeBinding {
+  return require("../dist") as NativeBinding;
+}
 
 if (!isMainThread) {
-  const spdog = require("../dist");
+  const spdog = loadSpdog();
+  const data = workerData as RuntimeWorkerData;
+  const port = parentPort;
+
+  if (!port) {
+    throw new Error("worker parentPort is missing");
+  }
 
   try {
-    for (let index = 0; index < workerData.iterations; index += 1) {
+    for (let index = 0; index < data.iterations; index += 1) {
       if (index % 3 === 0) {
         spdog.useConsoleLogger();
       } else {
-        spdog.useBasicFileLogger(workerData.loggerName, workerData.filePath, index === 1);
+        spdog.useBasicFileLogger(data.loggerName, data.filePath, index === 1);
       }
 
-      spdog.info(`worker ${workerData.id} iteration ${index}`);
+      spdog.info(`worker ${data.id} iteration ${index}`);
     }
 
     spdog.flush();
-    parentPort.postMessage({ ok: true });
+    port.postMessage({ ok: true } satisfies WorkerMessage);
   } catch (error) {
-    parentPort.postMessage({
+    port.postMessage({
       ok: false,
       error: error instanceof Error ? error.stack ?? error.message : String(error)
-    });
+    } satisfies WorkerMessage);
   }
 } else {
-  const spdog = require("../dist");
+  const spdog = loadSpdog();
 
-  function withTempDir(run) {
+  function withTempDir<T>(run: (tempDir: string) => Promise<T>): Promise<T>;
+  function withTempDir<T>(run: (tempDir: string) => T): T;
+  function withTempDir<T>(run: (tempDir: string) => T | Promise<T>): T | Promise<T> {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "spdog-test-"));
-    let result;
+    let result: T | Promise<T>;
 
     try {
       result = run(tempDir);
@@ -42,7 +74,7 @@ if (!isMainThread) {
       throw error;
     }
 
-    if (result && typeof result.then === "function") {
+    if (result instanceof Promise) {
       return result.finally(() => {
         fs.rmSync(tempDir, { recursive: true, force: true });
       });
@@ -52,23 +84,31 @@ if (!isMainThread) {
     return result;
   }
 
-  function runWorker(id, filePath, iterations) {
-    return new Promise((resolve, reject) => {
+  function runWorker(id: number, filePath: string, iterations: number): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       let settled = false;
       let sawSuccessMessage = false;
-      let exitCode = null;
+      let exitCode: number | null = null;
 
-      const finish = (callback, value) => {
+      const finishResolve = (): void => {
         if (settled) {
           return;
         }
         settled = true;
-        callback(value);
+        resolve();
       };
 
-      const maybeResolve = () => {
+      const finishReject = (error: Error): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(error);
+      };
+
+      const maybeResolve = (): void => {
         if (sawSuccessMessage && exitCode === 0) {
-          finish(resolve);
+          finishResolve();
         }
       };
 
@@ -78,24 +118,24 @@ if (!isMainThread) {
           filePath,
           iterations,
           loggerName: `worker-${id}`
-        }
+        } satisfies RuntimeWorkerData
       });
 
-      worker.once("message", (message) => {
-        if (message && message.ok) {
+      worker.once("message", (message: WorkerMessage) => {
+        if (message.ok) {
           sawSuccessMessage = true;
           maybeResolve();
           return;
         }
 
-        finish(reject, new Error(message && message.error ? message.error : `worker ${id} failed`));
+        finishReject(new Error(message.error || `worker ${id} failed`));
       });
 
-      worker.once("error", (error) => finish(reject, error));
-      worker.once("exit", (code) => {
+      worker.once("error", finishReject);
+      worker.once("exit", (code: number) => {
         exitCode = code;
         if (code !== 0) {
-          finish(reject, new Error(`worker ${id} exited with code ${code}`));
+          finishReject(new Error(`worker ${id} exited with code ${code}`));
           return;
         }
 
@@ -172,7 +212,7 @@ if (!isMainThread) {
 
   test("invalid log levels list supported values", () => {
     assert.throws(
-      () => spdog.setLevel("verbose"),
+      () => spdog.setLevel("verbose" as never),
       /Supported levels: trace, debug, info, warn, error, critical, off/
     );
   });
@@ -204,7 +244,7 @@ if (!isMainThread) {
     withTempDir((tempDir) => {
       const filePath = path.join(tempDir, "worker-cleanup.log");
 
-      execFileSync(process.execPath, [path.join(__dirname, "worker-cleanup-fixture.js")], {
+      execFileSync(process.execPath, [path.join(__dirname, "worker-cleanup-fixture.ts")], {
         cwd: path.join(__dirname, ".."),
         env: {
           ...process.env,

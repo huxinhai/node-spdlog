@@ -1,4 +1,6 @@
-import spdog from "../dist/index.js";
+import type { NativeBinding } from "../src/type";
+
+const spdog = require("../dist") as NativeBinding;
 
 spdog.setPattern("[%l] %v");
 spdog.setLevel("trace");

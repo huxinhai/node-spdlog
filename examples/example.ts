@@ -1,4 +1,6 @@
-const spdlog = require("../dist");
+import type { NativeBinding } from "../src/type";
+
+const spdlog = require("../dist") as NativeBinding;
 
 spdlog.setPattern("[%H:%M:%S] [%^%l%$] %v");
 spdlog.setLevel("trace");

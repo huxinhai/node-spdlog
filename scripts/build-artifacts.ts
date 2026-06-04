@@ -1,12 +1,15 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { execFileSync } from "node:child_process";
-import { createRequire } from "node:module";
+const { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } =
+  require("node:fs") as typeof import("node:fs");
+const os = require("node:os") as typeof import("node:os");
+const path = require("node:path") as typeof import("node:path");
+const { execFileSync } =
+  require("node:child_process") as typeof import("node:child_process");
+const { createRequire } =
+  require("node:module") as typeof import("node:module");
 
 const rootDir = process.cwd();
 const artifactsDir = path.join(rootDir, "artifacts");
-const require = createRequire(import.meta.url);
+const requireFromHere = createRequire(__filename);
 const sourceFiles = [
   "src/addon.cpp",
   "src/module_exports.cpp",
@@ -14,12 +17,20 @@ const sourceFiles = [
   "src/js_args.cpp"
 ];
 
-function resolveNodeAddonApiInclude() {
-  return path.dirname(require.resolve("node-addon-api"));
+function resolveNodeAddonApiInclude(): string {
+  return path.dirname(requireFromHere.resolve("node-addon-api"));
 }
 
-function resolveNodeHeadersInclude() {
-  const includeDir = path.join(os.homedir(), "Library", "Caches", "node-gyp", process.versions.node, "include", "node");
+function resolveNodeHeadersInclude(): string {
+  const includeDir = path.join(
+    os.homedir(),
+    "Library",
+    "Caches",
+    "node-gyp",
+    process.versions.node,
+    "include",
+    "node"
+  );
   if (!existsSync(includeDir)) {
     throw new Error(`Missing Node headers at ${includeDir}. Run "pnpm install" or "node-gyp install" first.`);
   }
@@ -29,7 +40,7 @@ function resolveNodeHeadersInclude() {
 const nodeAddonApiInclude = resolveNodeAddonApiInclude();
 const nodeHeadersInclude = resolveNodeHeadersInclude();
 
-function run(command, args) {
+function run(command: string, args: string[]): void {
   execFileSync(command, args, {
     cwd: rootDir,
     stdio: "inherit",
@@ -37,38 +48,38 @@ function run(command, args) {
   });
 }
 
-function ensureDir(dirPath) {
+function ensureDir(dirPath: string): void {
   mkdirSync(dirPath, { recursive: true });
 }
 
-function cleanDir(dirPath) {
+function cleanDir(dirPath: string): void {
   rmSync(dirPath, { recursive: true, force: true });
   ensureDir(dirPath);
 }
 
-function getSdkPath() {
+function getSdkPath(): string {
   return execFileSync("xcrun", ["--sdk", "macosx", "--show-sdk-path"], {
     cwd: rootDir,
     encoding: "utf8"
   }).trim();
 }
 
-function copyDist(targetDir) {
+function copyDist(targetDir: string): void {
   const distDir = path.join(rootDir, "dist");
   if (existsSync(distDir)) {
     cpSync(distDir, path.join(targetDir, "dist"), { recursive: true });
   }
 }
 
-function stripMacBinary(filePath) {
+function stripMacBinary(filePath: string): void {
   run("strip", ["-x", filePath]);
 }
 
-function buildTypescript() {
+function buildTypescript(): void {
   run("pnpm", ["run", "build:ts"]);
 }
 
-function buildMacArch(arch, sdkPath) {
+function buildMacArch(arch: "arm64" | "x64", sdkPath: string): void {
   const outDir = path.join(artifactsDir, `macos-${arch}`);
   const outFile = path.join(outDir, "spdog.node");
   const minVersion = "11.0";
@@ -114,7 +125,7 @@ function buildMacArch(arch, sdkPath) {
   copyDist(outDir);
 }
 
-function buildMacUniversal() {
+function buildMacUniversal(): boolean {
   const armFile = path.join(artifactsDir, "macos-arm64", "spdog.node");
   const x64File = path.join(artifactsDir, "macos-x64", "spdog.node");
   const outDir = path.join(artifactsDir, "macos-universal");
@@ -131,7 +142,7 @@ function buildMacUniversal() {
   return true;
 }
 
-function getDirectorySize(dirPath) {
+function getDirectorySize(dirPath: string): number {
   if (!existsSync(dirPath)) {
     return 0;
   }
@@ -145,11 +156,11 @@ function getDirectorySize(dirPath) {
   return total;
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KiB`;
 }
 
-function main() {
+function main(): void {
   cleanDir(artifactsDir);
   buildTypescript();
 
@@ -158,7 +169,7 @@ function main() {
   buildMacArch("x64", sdkPath);
   const universalBuilt = buildMacUniversal();
 
-  const summary = [
+  const summary: Array<[string, number]> = [
     ["macos-arm64", getDirectorySize(path.join(artifactsDir, "macos-arm64"))],
     ["macos-x64", getDirectorySize(path.join(artifactsDir, "macos-x64"))]
   ];

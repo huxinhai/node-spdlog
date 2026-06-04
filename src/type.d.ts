@@ -26,6 +26,6 @@ export interface NativeBinding {
   setFlushOn(level: LogLevel): void;
   setPattern(pattern: string): void;
   useConsoleLogger(): void;
-  useBasicFileLogger(name: string, filePath: string, truncate?: boolean): void;
+  useBasicFileLogger(name: string, filePath: string, truncate?: boolean | null): void;
   flush(): void;
 }

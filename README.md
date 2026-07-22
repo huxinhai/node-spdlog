@@ -133,3 +133,7 @@ On supported platforms, installation should not require a local compiler. If no 
 - The package name is `node-spdlog`.
 - The native module filename is `spdog.node`.
 - Linux prebuilt binaries are stripped and compressed when the compressed binary passes verification.
+
+## License
+
+MIT

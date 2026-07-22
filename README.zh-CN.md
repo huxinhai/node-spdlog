@@ -133,3 +133,7 @@ spdog.log(level, `spdlog ${version.major}.${version.minor}.${version.patch}`);
 - 包名是 `node-spdlog`。
 - 原生模块文件名是 `spdog.node`。
 - Linux 预构建二进制会在压缩后验证可用时进行 strip 和压缩。
+
+## 协议
+
+MIT

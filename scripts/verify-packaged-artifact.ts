@@ -7,7 +7,7 @@ if (!label) {
   throw new Error("ARTIFACT_LABEL is required");
 }
 
-const artifactDist = path.join("..", "artifacts", label, "dist");
+const artifactDist = path.join("..", "artifacts", label, "dist", "index.js");
 const spdog = (await import(artifactDist)) as NativeBinding;
 
 spdog.info("packaged artifact verification ok");

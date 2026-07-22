@@ -38,7 +38,7 @@ if (hasPrebuiltBinary()) {
 }
 
 console.log("node-spdlog: no bundled native binary found, building from source");
-execFileSync("node-gyp", ["rebuild"], {
+execFileSync(process.execPath, [path.join(rootDir, "node_modules", "node-gyp", "bin", "node-gyp.js"), "rebuild"], {
   cwd: rootDir,
   stdio: "inherit",
   env: process.env

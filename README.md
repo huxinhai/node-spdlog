@@ -4,45 +4,29 @@
 
 `node-spdlog` is a Node.js native addon backed by [`spdlog`](https://github.com/gabime/spdlog) and built with `node-addon-api`.
 
-It exposes a small default logger API for console logging, basic file logging, log levels, flush behavior, patterns, and the bundled `spdlog` version. The package is ESM-only with TypeScript declarations, while this repository's scripts, tests, and examples are executable TypeScript files that run directly on modern Node.js.
+It exposes a small default logger API for console logging, basic file logging, log levels, flush behavior, patterns, and the bundled `spdlog` version. The npm package is ESM-only with TypeScript declarations and prebuilt native binaries for supported platforms.
 
-## Requirements
+## Installation
+
+```bash
+npm install node-spdlog
+```
+
+You can also install it with another package manager:
+
+```bash
+pnpm add node-spdlog
+yarn add node-spdlog
+bun add node-spdlog
+```
+
+The package includes TypeScript declarations. Published releases include prebuilt binaries for supported platforms, so normal installation should not require cloning this repository or running `node-gyp` yourself. If a matching binary is not available, the install script falls back to a local source build.
+
+Runtime requirement:
 
 - Node.js `22.18.0` or newer
-- `pnpm` `10.12.4`
-- A C++20 toolchain supported by `node-gyp` when building from source
-- Git submodules enabled, because `spdlog/` is vendored as a submodule
-- Windows packaging only: `upx`
-
-Clone with submodules:
-
-```bash
-git clone --recursive <repo-url>
-```
-
-If the repository was cloned without submodules:
-
-```bash
-git submodule update --init --recursive
-```
-
-## Quick Start
-
-```bash
-pnpm install
-pnpm build
-pnpm test
-pnpm run verify:runtime
-pnpm example
-```
-
-`pnpm build` compiles the native addon to `build/Release/spdog.node` and emits the TypeScript wrapper to `dist/`.
-
-Published packages include prebuilt binaries for supported platforms. When a matching binary is present, the install script skips `node-gyp rebuild`; otherwise it falls back to building from source.
 
 ## Usage
-
-When installed as a package:
 
 ```ts
 import spdog from "node-spdlog";
@@ -59,6 +43,44 @@ spdog.flush();
 
 spdog.useConsoleLogger();
 ```
+
+## Build From Source
+
+Use this section only when developing this repository or when npm needs to compile the native addon locally.
+
+Requirements:
+
+- Node.js `22.18.0` or newer
+- `pnpm` `10.12.4`
+- A C++20 toolchain supported by `node-gyp`
+- Git submodules enabled, because `spdlog/` is vendored as a submodule
+- Windows packaging only: `upx`
+
+Clone with submodules:
+
+```bash
+git clone --recursive <repo-url>
+```
+
+If the repository was cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Development Quick Start
+
+```bash
+pnpm install
+pnpm build
+pnpm test
+pnpm run verify:runtime
+pnpm example
+```
+
+`pnpm build` compiles the native addon to `build/Release/spdog.node` and emits the TypeScript wrapper to `dist/`.
+
+Published packages include prebuilt binaries for supported platforms. When a matching binary is present, the install script skips `node-gyp rebuild`; otherwise it falls back to building from source.
 
 Inside this checkout after `pnpm build`, import from `./dist/index.js` or run `pnpm example`.
 
@@ -141,28 +163,17 @@ ARTIFACT_LABEL=macos-arm64 pnpm run package:runner
 ARTIFACT_LABEL=macos-arm64 pnpm run verify:packaged
 ```
 
-## CI And Releases
+## Supported Prebuilt Platforms
 
-`.github/workflows/build.yml` runs on pushes to `main`, pull requests, and manual dispatch. It checks out submodules, installs with `pnpm`, builds, tests, verifies runtime behavior, packages the runner artifact, verifies the packaged artifact, and uploads `artifacts/**`.
+Published packages include prebuilt native binaries for:
 
-The CI matrix is:
+- macOS x64
+- macOS arm64
+- Linux x64
+- Linux arm64
+- Windows x64
 
-- `macos-15-intel` as `macos-x64`
-- `macos-14` as `macos-arm64`
-- `ubuntu-latest` as `linux-x64`
-- `ubuntu-24.04-arm` as `linux-arm64`
-- `windows-latest` as `windows-x64`
-
-`.github/workflows/release.yml` runs on `v*` tags or manual dispatch. It builds and verifies the same matrix, uploads artifacts, bundles them as zip files, publishes a GitHub Release, assembles all prebuilt binaries into the npm package, and publishes to npm with provenance.
-
-The GitHub repository must have an npm automation token stored as the `NPM_TOKEN` secret before release publishing can succeed.
-
-Release tags look like:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+On unsupported platforms, installation falls back to `node-gyp rebuild`.
 
 ## Notes
 

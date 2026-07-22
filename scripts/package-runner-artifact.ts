@@ -54,8 +54,14 @@ function stripIfMac(filePath: string): void {
   }
 }
 
-function compressIfWindows(filePath: string): void {
-  if (process.platform === "win32") {
+function stripIfLinux(filePath: string): void {
+  if (process.platform === "linux") {
+    execFileSync("strip", ["--strip-unneeded", filePath], { cwd: rootDir, stdio: "inherit" });
+  }
+}
+
+function compressIfSupported(filePath: string): void {
+  if (process.platform === "linux" || process.platform === "win32") {
     execFileSync("upx", ["--best", "--lzma", filePath], { cwd: rootDir, stdio: "inherit" });
   }
 }
@@ -71,7 +77,8 @@ function main(): void {
   const targetNodePath = path.join(targetDir, "spdog.node");
   copyFileSync(releaseNodePath, targetNodePath);
   stripIfMac(targetNodePath);
-  compressIfWindows(targetNodePath);
+  stripIfLinux(targetNodePath);
+  compressIfSupported(targetNodePath);
 
   if (existsSync(distDir)) {
     cpSync(distDir, path.join(targetDir, "dist"), { recursive: true });

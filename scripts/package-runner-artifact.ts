@@ -62,7 +62,21 @@ function stripIfLinux(filePath: string): void {
 
 function compressIfSupported(filePath: string): void {
   if (process.platform === "linux" || process.platform === "win32") {
-    execFileSync("upx", ["--best", "--lzma", filePath], { cwd: rootDir, stdio: "inherit" });
+    const backupPath = `${filePath}.uncompressed`;
+    copyFileSync(filePath, backupPath);
+
+    try {
+      execFileSync("upx", ["--best", "--lzma", filePath], { cwd: rootDir, stdio: "inherit" });
+      execFileSync(process.execPath, ["-e", `require(${JSON.stringify(filePath)})`], {
+        cwd: rootDir,
+        stdio: "inherit"
+      });
+      rmSync(backupPath, { force: true });
+    } catch (error) {
+      console.warn("UPX-compressed native module failed verification; using stripped binary.");
+      copyFileSync(backupPath, filePath);
+      rmSync(backupPath, { force: true });
+    }
   }
 }
 

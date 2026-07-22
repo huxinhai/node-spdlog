@@ -4,13 +4,13 @@
 
 `node-spdlog` is a Node.js native addon backed by [`spdlog`](https://github.com/gabime/spdlog) and built with `node-addon-api`.
 
-It exposes a small default logger API for console logging, basic file logging, log levels, flush behavior, patterns, and the bundled `spdlog` version. The package entry is CommonJS with TypeScript declarations, while this repository's scripts, tests, and examples are executable TypeScript files that run directly on modern Node.js.
+It exposes a small default logger API for console logging, basic file logging, log levels, flush behavior, patterns, and the bundled `spdlog` version. The package is ESM-only with TypeScript declarations, while this repository's scripts, tests, and examples are executable TypeScript files that run directly on modern Node.js.
 
 ## Requirements
 
 - Node.js `22.18.0` or newer
 - `pnpm` `10.12.4`
-- A C++20 toolchain supported by `node-gyp`
+- A C++20 toolchain supported by `node-gyp` when building from source
 - Git submodules enabled, because `spdlog/` is vendored as a submodule
 - Windows packaging only: `upx`
 
@@ -37,6 +37,8 @@ pnpm example
 ```
 
 `pnpm build` compiles the native addon to `build/Release/spdog.node` and emits the TypeScript wrapper to `dist/`.
+
+Published packages include prebuilt binaries for supported platforms. When a matching binary is present, the install script skips `node-gyp rebuild`; otherwise it falls back to building from source.
 
 ## Usage
 
@@ -84,10 +86,12 @@ Log levels are:
 
 The generated wrapper in `dist/` loads `spdog.node` from:
 
-1. The package root, which is how packaged artifacts are laid out.
-2. `build/Release/spdog.node`, which is how local `node-gyp rebuild` outputs the addon.
+1. `artifacts/<platform-arch>/spdog.node`, which is how published prebuilt binaries are laid out.
+2. `artifacts/macos-universal/spdog.node` on macOS, as a fallback for either macOS architecture.
+3. The package root, which is how single-runner packaged artifacts can be laid out.
+4. `build/Release/spdog.node`, which is how local `node-gyp rebuild` outputs the addon.
 
-If neither file can be loaded, the package throws an error that lists every attempted path.
+If no binary can be loaded, the package throws an error that lists every attempted path.
 
 ## TypeScript Layout
 
@@ -97,6 +101,7 @@ Node.js can run the repository's TypeScript scripts directly, so tracked JavaScr
 - `tsconfig.build.json` emits only `src/**/*.ts` into `dist/`.
 - `erasableSyntaxOnly` is enabled to keep directly executed TypeScript compatible with Node's type stripping.
 - Runtime package output remains JavaScript in `dist/` so consumers can use the package normally.
+- Native `.node` loading uses `createRequire(import.meta.url)` internally, which keeps the public package ESM while still loading the native addon correctly.
 
 ## Project Layout
 
@@ -144,9 +149,13 @@ The CI matrix is:
 
 - `macos-15-intel` as `macos-x64`
 - `macos-14` as `macos-arm64`
+- `ubuntu-latest` as `linux-x64`
+- `ubuntu-24.04-arm` as `linux-arm64`
 - `windows-latest` as `windows-x64`
 
-`.github/workflows/release.yml` runs on `v*` tags or manual dispatch. It builds and verifies the same matrix, uploads artifacts, bundles them as zip files, and publishes a GitHub Release.
+`.github/workflows/release.yml` runs on `v*` tags or manual dispatch. It builds and verifies the same matrix, uploads artifacts, bundles them as zip files, publishes a GitHub Release, assembles all prebuilt binaries into the npm package, and publishes to npm with provenance.
+
+The GitHub repository must have an npm automation token stored as the `NPM_TOKEN` secret before release publishing can succeed.
 
 Release tags look like:
 

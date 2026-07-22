@@ -1,7 +1,7 @@
-import { loadBinding } from "./binding";
-import type { NativeBinding } from "./type";
+import { loadBinding } from "./binding.js";
+import type { NativeBinding } from "./type.js";
 
-export type { LogLevel, NativeBinding, SpdlogVersion } from "./type";
+export type { LogLevel, NativeBinding, SpdlogVersion } from "./type.js";
 
 const spdlog: NativeBinding = loadBinding();
 

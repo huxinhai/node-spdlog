@@ -1,9 +1,10 @@
-import type { NativeBinding } from "../src/type";
+import { Worker, isMainThread, workerData } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
 
-const { Worker, isMainThread, workerData } =
-  require("node:worker_threads") as typeof import("node:worker_threads");
+import type { NativeBinding } from "../src/type.js";
 
 const expectedMessage = "worker cleanup hook message";
+const filename = fileURLToPath(import.meta.url);
 
 type CleanupWorkerData = {
   filePath: string;
@@ -21,7 +22,7 @@ if (isMainThread) {
   if (!filePath) {
     fail(new Error("SPDOG_TEST_FILE is required"));
   } else {
-    const worker = new Worker(__filename, {
+    const worker = new Worker(filename, {
       workerData: { filePath } satisfies CleanupWorkerData
     });
 
@@ -34,7 +35,7 @@ if (isMainThread) {
     });
   }
 } else {
-  const spdog = require("../dist") as NativeBinding;
+  const spdog = (await import("../dist/index.js")) as NativeBinding;
   const data = workerData as CleanupWorkerData;
 
   spdog.useBasicFileLogger("cleanup-worker", data.filePath, true);

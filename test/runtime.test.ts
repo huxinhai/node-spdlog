@@ -1,14 +1,17 @@
-import type { NativeBinding } from "../src/type";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
-const assert: typeof import("node:assert/strict") = require("node:assert/strict");
-const { execFileSync } =
-  require("node:child_process") as typeof import("node:child_process");
-const fs = require("node:fs") as typeof import("node:fs");
-const os = require("node:os") as typeof import("node:os");
-const path = require("node:path") as typeof import("node:path");
-const test = require("node:test") as typeof import("node:test");
-const { Worker, isMainThread, parentPort, workerData } =
-  require("node:worker_threads") as typeof import("node:worker_threads");
+import type { NativeBinding } from "../src/type.js";
+import spdogBinding from "../dist/index.js";
+
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
 
 type RuntimeWorkerData = {
   id: number;
@@ -27,7 +30,7 @@ type WorkerMessage =
     };
 
 function loadSpdog(): NativeBinding {
-  return require("../dist") as NativeBinding;
+  return spdogBinding as NativeBinding;
 }
 
 if (!isMainThread) {
@@ -112,7 +115,7 @@ if (!isMainThread) {
         }
       };
 
-      const worker = new Worker(__filename, {
+      const worker = new Worker(filename, {
         workerData: {
           id,
           filePath,
@@ -244,8 +247,8 @@ if (!isMainThread) {
     withTempDir((tempDir) => {
       const filePath = path.join(tempDir, "worker-cleanup.log");
 
-      execFileSync(process.execPath, [path.join(__dirname, "worker-cleanup-fixture.ts")], {
-        cwd: path.join(__dirname, ".."),
+      execFileSync(process.execPath, [path.join(dirname, "worker-cleanup-fixture.ts")], {
+        cwd: path.join(dirname, ".."),
         env: {
           ...process.env,
           SPDOG_TEST_FILE: filePath

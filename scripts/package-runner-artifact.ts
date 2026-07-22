@@ -1,9 +1,7 @@
-const { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } =
-  require("node:fs") as typeof import("node:fs");
-const os = require("node:os") as typeof import("node:os");
-const path = require("node:path") as typeof import("node:path");
-const { execFileSync } =
-  require("node:child_process") as typeof import("node:child_process");
+import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const rootDir = process.cwd();
 const artifactsDir = path.join(rootDir, "artifacts");

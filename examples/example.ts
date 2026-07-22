@@ -1,6 +1,6 @@
-import type { NativeBinding } from "../src/type";
+import type { NativeBinding } from "../src/type.js";
 
-const spdlog = require("../dist") as NativeBinding;
+const spdlog = (await import("../dist/index.js")) as NativeBinding;
 
 spdlog.setPattern("[%H:%M:%S] [%^%l%$] %v");
 spdlog.setLevel("trace");

@@ -1,12 +1,37 @@
 import path from "node:path";
 import fs from "node:fs";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
-import type { NativeBinding } from "./type";
+import type { NativeBinding } from "./type.js";
+
+const require = createRequire(import.meta.url);
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function candidateBindingPaths(): string[] {
+  const platform =
+    process.platform === "darwin"
+      ? "macos"
+      : process.platform === "win32"
+        ? "windows"
+        : process.platform === "linux"
+          ? "linux"
+          : process.platform;
+  const artifactLabel = `${platform}-${process.arch}`;
+  const artifactPaths = [
+    path.join(dirname, "..", "artifacts", artifactLabel, "spdog.node")
+  ];
+
+  if (process.platform === "darwin") {
+    artifactPaths.push(
+      path.join(dirname, "..", "artifacts", "macos-universal", "spdog.node")
+    );
+  }
+
   return [
-    path.join(__dirname, "..", "spdog.node"),
-    path.join(__dirname, "..", "build", "Release", "spdog.node")
+    ...artifactPaths,
+    path.join(dirname, "..", "spdog.node"),
+    path.join(dirname, "..", "build", "Release", "spdog.node")
   ];
 }
 
@@ -28,6 +53,6 @@ export function loadBinding(): NativeBinding {
   }
 
   throw new Error(
-    `Failed to load native addon. Checked:\n${attempted.join("\n")}\nRun "pnpm build" first.`
+    `Failed to load native addon. Checked:\n${attempted.join("\n")}\nInstall a supported prebuilt package or run "pnpm build" first.`
   );
 }

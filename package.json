@@ -2,13 +2,13 @@
   "name": "node-spdlog",
   "version": "0.1.0",
   "description": "Node.js native addon powered by spdlog via node-addon-api.",
-  "type": "commonjs",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
@@ -17,6 +17,7 @@
     "build/Release/*.node",
     "artifacts",
     "binding.gyp",
+    "scripts/install.ts",
     "src",
     "spdlog"
   ],
@@ -26,7 +27,7 @@
     "build:ts": "tsc -p tsconfig.build.json && node scripts/copy-type-declarations.ts",
     "clean": "node scripts/clean.ts",
     "example": "pnpm run build && node examples/example.ts",
-    "install": "node-gyp rebuild",
+    "install": "node scripts/install.ts",
     "build:artifacts": "node scripts/build-artifacts.ts",
     "package:runner": "node scripts/package-runner-artifact.ts",
     "test": "pnpm run typecheck && node --test test/runtime.test.ts",

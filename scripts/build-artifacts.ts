@@ -1,15 +1,12 @@
-const { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } =
-  require("node:fs") as typeof import("node:fs");
-const os = require("node:os") as typeof import("node:os");
-const path = require("node:path") as typeof import("node:path");
-const { execFileSync } =
-  require("node:child_process") as typeof import("node:child_process");
-const { createRequire } =
-  require("node:module") as typeof import("node:module");
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 
 const rootDir = process.cwd();
 const artifactsDir = path.join(rootDir, "artifacts");
-const requireFromHere = createRequire(__filename);
+const requireFromHere = createRequire(import.meta.url);
 const sourceFiles = [
   "src/addon.cpp",
   "src/module_exports.cpp",

@@ -1,6 +1,6 @@
-import type { NativeBinding } from "../src/type";
+import type { NativeBinding } from "../src/type.js";
 
-const path = require("node:path") as typeof import("node:path");
+import path from "node:path";
 
 const label = process.env.ARTIFACT_LABEL?.trim();
 if (!label) {
@@ -8,7 +8,7 @@ if (!label) {
 }
 
 const artifactDist = path.join("..", "artifacts", label, "dist");
-const spdog = require(artifactDist) as NativeBinding;
+const spdog = (await import(artifactDist)) as NativeBinding;
 
 spdog.info("packaged artifact verification ok");
 console.log(JSON.stringify(spdog.version));

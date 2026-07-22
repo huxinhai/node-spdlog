@@ -22,6 +22,10 @@ jobs:
             label: macos-x64
           - os: macos-14
             label: macos-arm64
+          - os: ubuntu-latest
+            label: linux-x64
+          - os: ubuntu-24.04-arm
+            label: linux-arm64
           - os: windows-latest
             label: windows-x64
     steps:

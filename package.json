@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "Node.js native addon powered by spdlog via node-addon-api.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huxinhai/node-spdlog.git"
+  },
+  "bugs": {
+    "url": "https://github.com/huxinhai/node-spdlog/issues"
+  },
+  "homepage": "https://github.com/huxinhai/node-spdlog#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

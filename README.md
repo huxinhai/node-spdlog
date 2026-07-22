@@ -1,6 +1,6 @@
 # node-spdlog
 
-[中文文档](./README.zh-CN.md)
+[中文文档](https://github.com/huxinhai/node-spdlog/blob/main/README.zh-CN.md)
 
 `node-spdlog` is a Node.js native addon backed by [`spdlog`](https://github.com/gabime/spdlog). It provides a small ESM logger API for console logging, basic file logging, log levels, flush behavior, output patterns, and access to the bundled `spdlog` version.
 

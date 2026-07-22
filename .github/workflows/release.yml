@@ -127,7 +127,7 @@ jobs:
             cp -R "$dir/$label" "artifacts/$label"
           done
           cp -R artifacts/linux-x64/dist ./dist
-          node -e "const pkg=require('./package.json'); if (!process.env.GITHUB_REF_NAME.endsWith(pkg.version)) { throw new Error(\`Tag ${process.env.GITHUB_REF_NAME} does not match package version ${pkg.version}\`); }"
+          node -e 'const pkg=require("./package.json"); if (!process.env.GITHUB_REF_NAME.endsWith(pkg.version)) { throw new Error("Tag " + process.env.GITHUB_REF_NAME + " does not match package version " + pkg.version); }'
 
       - name: Verify npm package contents
         run: npm publish --dry-run --provenance

@@ -132,6 +132,9 @@ jobs:
       - name: Verify npm package contents
         run: npm publish --dry-run --provenance
 
+      - name: Verify npm package install
+        run: pnpm run verify:packed-install
+
       - name: Bundle release archives
         shell: bash
         run: |

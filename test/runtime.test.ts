@@ -157,7 +157,7 @@ if (!isMainThread) {
 
         assert.throws(
           () => spdog.useBasicFileLogger("invalid-file-target", tempDir, true),
-          /Failed opening file/
+          /Failed opening file|system error/
         );
 
         spdog.useBasicFileLogger("valid-file-target", validFilePath, true);

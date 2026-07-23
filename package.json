@@ -1,6 +1,6 @@
 {
   "name": "node-spdlog",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Node.js native addon powered by spdlog via node-addon-api.",
   "type": "module",
   "repository": {
@@ -45,6 +45,11 @@
     "verify:runtime": "node scripts/verify-runtime.ts"
   },
   "keywords": [
+    "node-spdlog",
+    "node",
+    "logger",
+    "logging",
+    "log",
     "node-addon-api",
     "napi",
     "native-addon",

@@ -27,5 +27,10 @@ export interface NativeBinding {
   setPattern(pattern: string): void;
   useConsoleLogger(): void;
   useBasicFileLogger(name: string, filePath: string, truncate?: boolean | null): void;
+  /** Switches to a background writer. A full queue blocks until space is available. */
+  useAsyncConsoleLogger(): void;
+  /** Switches to a background file writer. A full queue blocks until space is available. */
+  useAsyncBasicFileLogger(name: string, filePath: string, truncate?: boolean | null): void;
+  /** Blocks until earlier queued messages are written and fflush completes; does not fsync. */
   flush(): void;
 }

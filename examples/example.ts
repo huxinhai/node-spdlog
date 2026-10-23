@@ -12,5 +12,9 @@ spdlog.useBasicFileLogger("demo-file", "example.log", true);
 spdlog.info("this line is written into example.log");
 spdlog.flush();
 
+spdlog.useAsyncBasicFileLogger("demo-async-file", "example-async.log", true);
+spdlog.info("this line is queued for the background thread");
+spdlog.flush(); // Waits for queued logs to be written and flushed.
+
 spdlog.useConsoleLogger();
 spdlog.warn("switched back to the console logger");

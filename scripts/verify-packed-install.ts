@@ -31,10 +31,26 @@ try {
     [
       "--input-type=module",
       "-e",
-      'import spdog from "node-spdlog"; console.log(JSON.stringify(spdog.version)); spdog.info("packed npm install verification ok");'
+      `import assert from "node:assert/strict";
+       import { readFileSync } from "node:fs";
+       import spdog, { useAsyncBasicFileLogger, useAsyncConsoleLogger } from "node-spdlog";
+       console.log(JSON.stringify(spdog.version));
+       spdog.info("packed npm install verification ok");
+       spdog.setPattern("%v");
+       assert.equal(useAsyncBasicFileLogger, spdog.useAsyncBasicFileLogger);
+       assert.equal(useAsyncConsoleLogger, spdog.useAsyncConsoleLogger);
+       useAsyncBasicFileLogger("packed-async-file", "async.log", true);
+       spdog.info("async packed npm install verification ok");
+       spdog.flush();
+       assert.equal(readFileSync("async.log", "utf8").trimEnd(), "async packed npm install verification ok");
+       useAsyncConsoleLogger();
+       spdog.info("async packed console verification ok");
+       spdog.flush();
+       spdog.useConsoleLogger();`
     ],
     {
       cwd: tempDir,
+      timeout: 30_000,
       stdio: "inherit"
     }
   );

@@ -57,6 +57,21 @@ Napi::Value UseBasicFileLoggerBinding(const Napi::CallbackInfo& info) {
   });
 }
 
+Napi::Value UseAsyncConsoleLoggerBinding(const Napi::CallbackInfo& info) {
+  return node_spdlog::WrapVoid(info, [&]() {
+    node_spdlog::UseAsyncConsoleLogger();
+  });
+}
+
+Napi::Value UseAsyncBasicFileLoggerBinding(const Napi::CallbackInfo& info) {
+  return node_spdlog::WrapVoid(info, [&]() {
+    const auto name = node_spdlog::ReadRequiredString(info, 0, "name");
+    const auto file_path = node_spdlog::ReadRequiredString(info, 1, "filePath");
+    const auto truncate = node_spdlog::ReadOptionalBool(info, 2, false, "truncate");
+    node_spdlog::UseAsyncBasicFileLogger(name, file_path, truncate);
+  });
+}
+
 Napi::Value FlushBinding(const Napi::CallbackInfo& info) {
   return node_spdlog::WrapVoid(info, [&]() {
     node_spdlog::Flush();
@@ -103,6 +118,8 @@ Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
   exports.Set("setPattern", Napi::Function::New(env, SetPatternBinding));
   exports.Set("useConsoleLogger", Napi::Function::New(env, UseConsoleLoggerBinding));
   exports.Set("useBasicFileLogger", Napi::Function::New(env, UseBasicFileLoggerBinding));
+  exports.Set("useAsyncConsoleLogger", Napi::Function::New(env, UseAsyncConsoleLoggerBinding));
+  exports.Set("useAsyncBasicFileLogger", Napi::Function::New(env, UseAsyncBasicFileLoggerBinding));
   exports.Set("flush", Napi::Function::New(env, FlushBinding));
   exports.Set("version", CreateVersionObject(env));
 

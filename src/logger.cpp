@@ -1,13 +1,21 @@
 #include "logger.h"
 
-#include <atomic>
+#include <exception>
+#include <cstdio>
 #include <filesystem>
+#include <future>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
+#include "spdlog/async_logger.h"
 #include "spdlog/details/os.h"
+#include "spdlog/details/thread_pool.h"
 #include "spdlog/logger.h"
+#include "spdlog/sinks/base_sink.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/version.h"
@@ -17,6 +25,66 @@ namespace {
 constexpr const char* kConsoleLoggerName = "node_spdlog_console";
 constexpr const char* kDefaultPattern = "[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v";
 constexpr const char* kSupportedLevels = "trace, debug, info, warn, error, critical, off";
+constexpr std::size_t kAsyncQueueSize = 8192;
+
+// A separate flush message gives us an exact FIFO barrier, even when earlier
+// messages trigger flush_on(). The sink never owns the thread pool.
+class FlushBarrierSink final : public spdlog::sinks::base_sink<std::mutex> {
+ public:
+  explicit FlushBarrierSink(std::vector<spdlog::sink_ptr> sinks) : sinks_(std::move(sinks)) {}
+
+  std::future<void> GetFuture() { return completion_.get_future(); }
+
+ protected:
+  void sink_it_(const spdlog::details::log_msg&) override {}
+
+  void flush_() override {
+    try {
+      for (const auto& sink : sinks_) {
+        sink->flush();
+      }
+      completion_.set_value();
+    } catch (...) {
+      completion_.set_exception(std::current_exception());
+    }
+  }
+
+ private:
+  std::vector<spdlog::sink_ptr> sinks_;
+  std::promise<void> completion_;
+};
+
+struct LoggerRuntime {
+  std::shared_ptr<spdlog::logger> logger;
+  // Destroy/join the pool before releasing the logger. Queue messages own only
+  // the spdlog logger, so the runtime cannot be destroyed by its own worker.
+  std::shared_ptr<spdlog::details::thread_pool> pool;
+
+  void Flush(bool propagate_errors = true) const {
+    if (!pool) {
+      logger->flush();
+      return;
+    }
+
+    auto sink = std::make_shared<FlushBarrierSink>(logger->sinks());
+    auto completion = sink->GetFuture();
+    auto barrier = std::make_shared<spdlog::async_logger>("node_spdlog_flush", sink, pool);
+    pool->post_flush(std::move(barrier), spdlog::async_overflow_policy::block);
+    // Only sink errors arrive through the future, after the FIFO barrier has
+    // completed. Switching must still be possible when the old device fails.
+    if (propagate_errors) {
+      completion.get();
+    } else {
+      try {
+        completion.get();
+      } catch (const std::exception& error) {
+        std::fprintf(stderr, "[node-spdlog] Failed to flush previous logger: %s\n", error.what());
+      } catch (...) {
+        std::fputs("[node-spdlog] Failed to flush previous logger\n", stderr);
+      }
+    }
+  }
+};
 
 struct LoggerState {
   std::string pattern = kDefaultPattern;
@@ -24,19 +92,20 @@ struct LoggerState {
   spdlog::level::level_enum flush_level = spdlog::level::off;
 };
 
-std::mutex g_logger_state_mutex;
-std::shared_ptr<spdlog::logger> g_current_logger;
+// Readers hold the gate through enqueue/flush. A switch can then drain the old
+// queue before opening a replacement file (which may truncate the same path).
+std::shared_mutex g_logger_state_mutex;
+std::shared_ptr<LoggerRuntime> g_current_logger;
 LoggerState g_logger_state;
 std::size_t g_active_environment_count = 0;
 
-std::shared_ptr<spdlog::logger> CreateConsoleLogger();
+std::shared_ptr<LoggerRuntime> CreateConsoleLogger(bool async = false);
 
-std::shared_ptr<spdlog::logger> LoadCurrentLogger() {
-  auto logger = std::atomic_load_explicit(&g_current_logger, std::memory_order_acquire);
-  if (!logger) {
+const std::shared_ptr<LoggerRuntime>& LoadCurrentLogger() {
+  if (!g_current_logger) {
     throw std::runtime_error("Logger is not initialized");
   }
-  return logger;
+  return g_current_logger;
 }
 
 void ApplyLoggerState(const std::shared_ptr<spdlog::logger>& logger, const LoggerState& state) {
@@ -46,18 +115,35 @@ void ApplyLoggerState(const std::shared_ptr<spdlog::logger>& logger, const Logge
 }
 
 void EnsureLoggerInitializedLocked() {
-  if (std::atomic_load_explicit(&g_current_logger, std::memory_order_acquire)) {
+  if (g_current_logger) {
     return;
   }
 
   auto logger = CreateConsoleLogger();
-  ApplyLoggerState(logger, g_logger_state);
-  std::atomic_store_explicit(&g_current_logger, std::move(logger), std::memory_order_release);
+  ApplyLoggerState(logger->logger, g_logger_state);
+  g_current_logger = std::move(logger);
 }
 
-std::shared_ptr<spdlog::logger> CreateConsoleLogger() {
+std::shared_ptr<LoggerRuntime> CreateLogger(
+  const std::string& name,
+  spdlog::sink_ptr sink,
+  bool async
+) {
+  auto runtime = std::make_shared<LoggerRuntime>();
+  if (async) {
+    runtime->pool = std::make_shared<spdlog::details::thread_pool>(kAsyncQueueSize, 1);
+    runtime->logger = std::make_shared<spdlog::async_logger>(
+      name, std::move(sink), runtime->pool, spdlog::async_overflow_policy::block
+    );
+  } else {
+    runtime->logger = std::make_shared<spdlog::logger>(name, std::move(sink));
+  }
+  return runtime;
+}
+
+std::shared_ptr<LoggerRuntime> CreateConsoleLogger(bool async) {
   auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-  return std::make_shared<spdlog::logger>(kConsoleLoggerName, std::move(sink));
+  return CreateLogger(kConsoleLoggerName, std::move(sink), async);
 }
 
 spdlog::filename_t ToSpdlogFilename(const std::string& file_path) {
@@ -84,15 +170,37 @@ void EnsureContainingDirectory(const spdlog::filename_t& file_path) {
   }
 }
 
-std::shared_ptr<spdlog::logger> CreateBasicFileLogger(
+std::shared_ptr<LoggerRuntime> CreateBasicFileLogger(
   const std::string& name,
   const std::string& file_path,
-  bool truncate
+  bool truncate,
+  bool async
 ) {
   const auto filename = ToSpdlogFilename(file_path);
   EnsureContainingDirectory(filename);
   auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(filename, truncate);
-  return std::make_shared<spdlog::logger>(name, std::move(sink));
+  return CreateLogger(name, std::move(sink), async);
+}
+
+void SwitchConsoleLogger(bool async) {
+  std::unique_lock lock(g_logger_state_mutex);
+  LoadCurrentLogger()->Flush(/*propagate_errors=*/false);
+  auto logger = CreateConsoleLogger(async);
+  ApplyLoggerState(logger->logger, g_logger_state);
+  g_current_logger = std::move(logger);
+}
+
+void SwitchBasicFileLogger(
+  const std::string& name,
+  const std::string& file_path,
+  bool truncate,
+  bool async
+) {
+  std::unique_lock lock(g_logger_state_mutex);
+  LoadCurrentLogger()->Flush(/*propagate_errors=*/false);
+  auto logger = CreateBasicFileLogger(name, file_path, truncate, async);
+  ApplyLoggerState(logger->logger, g_logger_state);
+  g_current_logger = std::move(logger);
 }
 
 }  // namespace
@@ -100,86 +208,92 @@ std::shared_ptr<spdlog::logger> CreateBasicFileLogger(
 namespace node_spdlog {
 
 void Initialize() {
-  std::lock_guard<std::mutex> lock(g_logger_state_mutex);
+  std::unique_lock lock(g_logger_state_mutex);
   EnsureLoggerInitializedLocked();
 }
 
 void RegisterEnvironment() {
-  std::lock_guard<std::mutex> lock(g_logger_state_mutex);
+  std::unique_lock lock(g_logger_state_mutex);
   EnsureLoggerInitializedLocked();
   g_active_environment_count += 1;
 }
 
 void CleanupEnvironment() noexcept {
-  std::shared_ptr<spdlog::logger> logger;
-
-  {
-    std::lock_guard<std::mutex> lock(g_logger_state_mutex);
-    if (g_active_environment_count == 0) {
-      return;
-    }
-
-    g_active_environment_count -= 1;
-    if (g_active_environment_count != 0) {
-      return;
-    }
-
-    logger = std::atomic_exchange_explicit(
-      &g_current_logger,
-      std::shared_ptr<spdlog::logger>{},
-      std::memory_order_acq_rel
-    );
-    g_logger_state = LoggerState{};
+  std::unique_lock lock(g_logger_state_mutex);
+  if (g_active_environment_count == 0) {
+    return;
   }
+
+  g_active_environment_count -= 1;
+  if (g_active_environment_count != 0) {
+    return;
+  }
+
+  // Keep registration behind the gate until the old queue is drained and its
+  // pool joined, so a new environment cannot truncate a file still being used.
+  auto logger = std::move(g_current_logger);
+  g_logger_state = LoggerState{};
 
   if (!logger) {
     return;
   }
 
   try {
-    logger->flush();
+    logger->Flush();
   } catch (...) {
   }
 }
 
 void Log(spdlog::level::level_enum level, const std::string& message) {
-  LoadCurrentLogger()->log(level, message);
+  std::shared_lock lock(g_logger_state_mutex);
+  LoadCurrentLogger()->logger->log(level, message);
 }
 
 void SetLevel(spdlog::level::level_enum level) {
-  std::lock_guard<std::mutex> lock(g_logger_state_mutex);
-  LoadCurrentLogger()->set_level(level);
+  std::unique_lock lock(g_logger_state_mutex);
+  LoadCurrentLogger()->logger->set_level(level);
   g_logger_state.level = level;
 }
 
 void SetFlushOn(spdlog::level::level_enum level) {
-  std::lock_guard<std::mutex> lock(g_logger_state_mutex);
-  LoadCurrentLogger()->flush_on(level);
+  std::unique_lock lock(g_logger_state_mutex);
+  const auto& runtime = LoadCurrentLogger();
+  if (runtime->pool) {
+    runtime->Flush();
+  }
+  runtime->logger->flush_on(level);
   g_logger_state.flush_level = level;
 }
 
 void SetPattern(std::string pattern) {
-  std::lock_guard<std::mutex> lock(g_logger_state_mutex);
-  LoadCurrentLogger()->set_pattern(pattern);
+  std::unique_lock lock(g_logger_state_mutex);
+  const auto& runtime = LoadCurrentLogger();
+  if (runtime->pool) {
+    runtime->Flush();
+  }
+  runtime->logger->set_pattern(pattern);
   g_logger_state.pattern = std::move(pattern);
 }
 
 void UseConsoleLogger() {
-  std::lock_guard<std::mutex> lock(g_logger_state_mutex);
-  auto logger = CreateConsoleLogger();
-  ApplyLoggerState(logger, g_logger_state);
-  std::atomic_store_explicit(&g_current_logger, std::move(logger), std::memory_order_release);
+  SwitchConsoleLogger(false);
 }
 
 void UseBasicFileLogger(const std::string& name, const std::string& file_path, bool truncate) {
-  std::lock_guard<std::mutex> lock(g_logger_state_mutex);
-  auto logger = CreateBasicFileLogger(name, file_path, truncate);
-  ApplyLoggerState(logger, g_logger_state);
-  std::atomic_store_explicit(&g_current_logger, std::move(logger), std::memory_order_release);
+  SwitchBasicFileLogger(name, file_path, truncate, false);
+}
+
+void UseAsyncConsoleLogger() {
+  SwitchConsoleLogger(true);
+}
+
+void UseAsyncBasicFileLogger(const std::string& name, const std::string& file_path, bool truncate) {
+  SwitchBasicFileLogger(name, file_path, truncate, true);
 }
 
 void Flush() {
-  LoadCurrentLogger()->flush();
+  std::shared_lock lock(g_logger_state_mutex);
+  LoadCurrentLogger()->Flush();
 }
 
 spdlog::level::level_enum ParseLevel(std::string_view level) {

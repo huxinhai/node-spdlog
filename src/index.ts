@@ -18,6 +18,8 @@ export const setFlushOn = spdlog.setFlushOn;
 export const setPattern = spdlog.setPattern;
 export const useConsoleLogger = spdlog.useConsoleLogger;
 export const useBasicFileLogger = spdlog.useBasicFileLogger;
+export const useAsyncConsoleLogger = spdlog.useAsyncConsoleLogger;
+export const useAsyncBasicFileLogger = spdlog.useAsyncBasicFileLogger;
 export const flush = spdlog.flush;
 
 export default spdlog;
